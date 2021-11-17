@@ -6,7 +6,15 @@ console.log('Hello, world!');
 d3.csv("data/california_data_dump.csv").then(function(data1) {
 	console.log(data1);
 
-})
+var dom = [];
+for (Object d : data1)
+{
+    dom.push(d.get("Population"));
+}
+console.log(dom);
+const colorScale = d3.scaleThreshold()
+  .domain(dom);
+  .range(d3.schemeReds[60]);
 
 // The svg
 const svg = d3.select("svg"),
@@ -30,9 +38,17 @@ d3.json("https://raw.githubusercontent.com/codeforgermany/click_that_hood/main/p
         .selectAll("path")
         .data(data.features)
         .join("path")
-          .attr("fill", "grey")
+      //    .attr("fill", "grey")
           .attr("d", d3.geoPath()
               .projection(projection)
           )
+	// set the color of each country
+      .attr("fill", function (d) {
+        d.total = data.get(d.id) || 0;
+        return colorScale(d.total);
+      })
         .style("stroke", "none")
 })
+
+})
+
