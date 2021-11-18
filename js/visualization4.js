@@ -108,6 +108,8 @@ d3.json(
 //        </div>
 
 function findTopFive(cat, data) {
+  let top5Vals = [];
+  let top5Names = [];
   const top5 = data
     .sort(function (a, b) {
       return (
@@ -117,22 +119,51 @@ function findTopFive(cat, data) {
     })
     .slice(0, 5);
 
-  d3.select('#vis-2')
+  for (const t of top5) {
+    top5Vals.push(countyCrimeData[t.properties.name].violent);
+    top5Names.push(t.properties.name);
+  }
+
+  const xscale = d3
+    .scaleBand()
+    .domain(top5Names.map((d) => d))
+    .range([0, 260])
+    .padding(0.3);
+
+  const yscale = d3.scaleLinear().domain([0, 2300]).range([200, 0]);
+
+  const x_axis = d3.axisBottom().scale(xscale);
+
+  const y_axis = d3.axisLeft().scale(yscale);
+
+  var xAxisTranslate = 210 / 2 + 95;
+
+  let svg2 = d3
+    .select('#vis-2')
     .append('svg')
     .attr('width', 290)
-    .attr('height', 210)
+    .attr('height', 220)
     .attr('id', 'vis-2-svg')
-    .style('background', '#f3f3f3')
+    .append('g')
+    .attr('transform', 'translate(35, 0)')
+    .call(y_axis);
+
+  svg2
+    .append('g')
+    .attr('transform', 'translate(0, ' + xAxisTranslate + ')')
+    .call(x_axis);
+
+  svg2
     .selectAll('rect')
     .data(top5)
     .enter()
     .append('rect')
-    .attr('width', 40)
+    .attr('width', 30)
     .attr('height', function (data) {
       return countyCrimeData[data.properties.name].violent / 10;
     })
     .attr('x', function (data, i) {
-      return i * (40 + 20);
+      return 16 + i * (30 + 20);
     })
     .attr('y', function (data) {
       return 200 - countyCrimeData[data.properties.name].violent / 10;
