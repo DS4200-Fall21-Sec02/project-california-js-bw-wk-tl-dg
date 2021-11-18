@@ -96,7 +96,7 @@ h3 {
 
 .rightmain {
   width: 100%;
-  margin-top: 100px;
+  margin-top: 32px;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -106,6 +106,36 @@ h3 {
   color: rgb(153, 153, 153);
   font-size: 16px;
   font-weight: 300;
+}
+
+#tooltip {
+  width: 150px;
+  height: auto;
+  padding: 5px;
+  background-color: #fff;
+  color: #000;
+  -webkit-border-radius: 5px;
+  -moz-border-radius: 5px;
+  border-radius: 5px;
+  -webkit-box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.4);
+  -moz-box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.4);
+  box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+  position: absolute;
+}
+
+#tooltip.hidden {
+  display: none;
+}
+
+#tooltip p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 18px;
+}
+
+#vis-2-svg {
+  padding-left: 10px;
 }
 
 /* Fork on GitHub ribbon via https://codepo8.github.io/css-fork-on-github-ribbon/# */

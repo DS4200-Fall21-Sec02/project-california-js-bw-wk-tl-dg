@@ -3,18 +3,14 @@
 
 let countyCrimeData = {};
 
-d3.csv("data/california_data_dump.csv").then(function(data1) {
-	console.log(data1);
-
-var dom = [];
-for (Object d : data1)
-{
-    dom.push(d.get("Population"));
-}
-console.log(dom);
-const colorScale = d3.scaleThreshold()
-  .domain(dom);
-  .range(d3.schemeReds[60]);
+d3.csv('data/california_data_dump.csv').then(function (data) {
+  for (let d of data) {
+    countyCrimeData[d.County] = {
+      violent: parseFloat(d.Violent.replaceAll(',', '')),
+      population: parseInt(d.Population.replaceAll(',', '')),
+    };
+  }
+});
 
 // The svg
 const svg = d3.select('svg'),
@@ -33,7 +29,6 @@ d3.json(
   'https://raw.githubusercontent.com/codeforgermany/click_that_hood/main/public/data/california-counties.geojson'
 ).then(function (data) {
   // Filter data
-  // data.features = data.features.filter(d => {console.log(d.properties.name); return d.properties.name=="France"})
 
   // Draw the map
   svg
@@ -84,24 +79,21 @@ d3.json(
         return '#1daee5';
       }
     })
-    .attr('d', d3.geoPath().projection(projection));
+    .attr('d', d3.geoPath().projection(projection))
+				   	.on("mouseover", function(d){
+						var xPosition = w/2 + 150;
+						var yPosition = h/2;
+// 						var xPosition = parseFloat(path.centroid(this).attr("cx"));
+// 						var yPosition = parseFloat(path.centroid(this).attr("cy"));
+						d3.select("#tooltip")
+						.style("left", xPosition + "px")
+						.style("top", yPosition + "px");
+						d3.select("#county")
+						.text(d.properties.NAME);
+						d3.select("#tooltip")
+						.classed("hidden", false);
+						})
+						.on("mouseout", function(){
+						d3.select("#tooltip").classed("hidden", true);
+						});
 });
-    // Draw the map
-    svg.append("g")
-        .selectAll("path")
-        .data(data.features)
-        .join("path")
-      //    .attr("fill", "grey")
-          .attr("d", d3.geoPath()
-              .projection(projection)
-          )
-	// set the color of each country
-      .attr("fill", function (d) {
-        d.total = data.get(d.id) || 0;
-        return colorScale(d.total);
-      })
-        .style("stroke", "none")
-})
-
-})
-
