@@ -14,10 +14,14 @@ d3.csv('data/california_data_dump.csv').then(function (data) {
   }
 });
 
+let crimeData;
+
 // The svg
 const svg = d3.select('svg'),
   width = +svg.attr('width'),
   height = +svg.attr('height');
+
+let svg2 = d3.select('svg');
 
 // Map and projection
 const projection = d3
@@ -37,7 +41,7 @@ d3.json(
     .selectAll('path')
     .data(data.features)
     .join('path')
-    .style('border', '20px solid #BDBDBD')
+    .style('stroke', 'black')
     .attr('fill', function (d) {
       if (countyCrimeData[d.properties.name].violent < 49) {
         return '#1daee510';
@@ -82,9 +86,12 @@ d3.json(
     })
     .attr('d', d3.geoPath().projection(projection))
     // d is a mousevent, drill down to find the county name
+    .attr('id', function (d) {
+      return d.properties.name;
+    })
     .on('mouseover', function (d) {
-      console.log(d);
-      console.log(d.path[0].__data__.properties.name);
+      // console.log(d);
+      // console.log(d.path[0].__data__.properties.name);
       var xPosition = 5900;
       var yPosition = -300;
       // 						var xPosition = parseFloat(path.centroid(this).attr("cx"));
@@ -100,7 +107,18 @@ d3.json(
       d3.select('#tooltip').classed('hidden', true);
     });
 
-  findTopFive('crime', data.features);
+  svg.call(
+    d3
+      .brush() // Add the brush feature using the d3.brush function
+      .extent([
+        [0, 0],
+        [width, height],
+      ])
+      .on('end', updateStats)
+  );
+
+  crimeData = data.features;
+  findTopFive('crime', crimeData);
 });
 
 //	<div id="tooltip" class="hidden">
@@ -108,8 +126,9 @@ d3.json(
 //        </div>
 
 function findTopFive(cat, data) {
-  let top5Vals = [];
-  let top5Names = [];
+  if (document.getElementById('vis-2-svg')) {
+    document.getElementById('vis-2-svg').remove();
+  }
   const top5 = data
     .sort(function (a, b) {
       return (
@@ -118,6 +137,9 @@ function findTopFive(cat, data) {
       );
     })
     .slice(0, 5);
+
+  let top5Vals = [];
+  let top5Names = [];
 
   for (const t of top5) {
     top5Vals.push(countyCrimeData[t.properties.name].violent);
@@ -210,4 +232,63 @@ function findTopFive(cat, data) {
         return '#1daee5';
       }
     });
+}
+
+//Is called when we brush on scatterplot #1
+function updateStats(brushEvent) {
+  console.log(brushEvent.selection);
+  let rangeWithinDiv = brushEvent.selection;
+
+  let parent = document.getElementById('vis-svg-1').getBoundingClientRect();
+  let dataArr = [];
+  d3.selectAll('path').each(function () {
+    if (rangeWithinDiv) {
+      let top = this.getBoundingClientRect().top - parent.top;
+      let left = this.getBoundingClientRect().left - parent.left;
+      let height = this.getBoundingClientRect().height;
+      let width = this.getBoundingClientRect().width;
+      let center = [left + width / 2, top + height / 2];
+      if (
+        center[0] >= rangeWithinDiv[0][0] &&
+        center[0] <= rangeWithinDiv[0][1] &&
+        center[1] >= rangeWithinDiv[0][1] &&
+        center[1] <= rangeWithinDiv[1][1]
+      ) {
+        dataArr.push({ properties: { name: this.id } });
+        d3.select(this).style('opacity', '1');
+      } else {
+        d3.select(this).style('opacity', '0.2');
+      }
+      findTopFive('crime', dataArr);
+    } else {
+      d3.select(this).style('opacity', '1');
+      findTopFive('crime', crimeData);
+    }
+  });
+
+  // d3.selectAll('circle').each(function () {
+  //   const plot = this.parentElement.parentElement.parentElement.parentElement
+  //     .id;
+  //   const thisD3 = d3.select(this);
+  //   if (
+  //     plot === 'dataviz_brushScatter' &&
+  //     isBrushed(extent, thisD3.attr('cx'), thisD3.attr('cy'))
+  //   ) {
+  //     brushedArr.push(this.id);
+  //   }
+  // });
+
+  // d3.selectAll('circle')
+  //   .style('stroke', function () {
+  //     const plot = this.parentElement.parentElement.parentElement
+  //       .parentElement.id;
+  //     if (plot === 'dataviz_brushScatter2') {
+  //       if (brushedArr.includes(this.id)) {
+  //         return 'black';
+  //       } else {
+  //         return 'transparent';
+  //       }
+  //     }
+  //   })
+  //   .style('stroke-width', '2px');
 }
