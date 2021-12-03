@@ -1,20 +1,38 @@
 // Immediately Invoked Function Expression to limit access to our
 // variables and prevent
 
-let countyCrimeData = {};
+let countyData = {};
+
+let currentView = 'temperature';
+
+let currentColor = '#FFAE00';
 
 const margin = { top: 20, right: 20, bottom: 70, left: 40 };
 
 d3.csv('data/california_data_dump.csv').then(function (data) {
   for (let d of data) {
-    countyCrimeData[d.County] = {
-      violent: parseFloat(d.Violent.replaceAll(',', '')),
+    countyData[d.County] = {
+      crime: parseFloat(d.Violent.replaceAll(',', '')),
       population: parseInt(d.Population.replaceAll(',', '')),
+      salary: parseFloat(
+        d['Average Weekly Salary']
+          .replaceAll(',', '')
+          .replaceAll(' ', '')
+          .replaceAll('$', '')
+      ),
+      temperature: parseFloat(d.Temperature.replaceAll(',', '')),
+      rent: parseFloat(
+        d['1 BR Rent ']
+          .replaceAll(',', '')
+          .replaceAll(' ', '')
+          .replaceAll('$', '')
+      ),
     };
   }
+  console.log(countyData);
 });
 
-let crimeData;
+let countyNameData;
 
 // The svg
 const svg = d3.select('svg'),
@@ -43,68 +61,19 @@ d3.json(
     .join('path')
     .style('stroke', 'black')
     .attr('fill', function (d) {
-      if (countyCrimeData[d.properties.name].violent < 49) {
-        return '#1daee510';
-      } else if (
-        countyCrimeData[d.properties.name].violent > 49 &&
-        countyCrimeData[d.properties.name].violent < 99
-      ) {
-        return '#1daee520';
-      } else if (
-        countyCrimeData[d.properties.name].violent > 99 &&
-        countyCrimeData[d.properties.name].violent < 149
-      ) {
-        return '#1daee530';
-      } else if (
-        countyCrimeData[d.properties.name].violent > 149 &&
-        countyCrimeData[d.properties.name].violent < 199
-      ) {
-        return '#1daee540';
-      } else if (
-        countyCrimeData[d.properties.name].violent > 199 &&
-        countyCrimeData[d.properties.name].violent < 299
-      ) {
-        return '#1daee550';
-      } else if (
-        countyCrimeData[d.properties.name].violent > 299 &&
-        countyCrimeData[d.properties.name].violent < 399
-      ) {
-        return '#1daee560';
-      } else if (
-        countyCrimeData[d.properties.name].violent > 399 &&
-        countyCrimeData[d.properties.name].violent < 499
-      ) {
-        return '#1daee570';
-      } else if (
-        countyCrimeData[d.properties.name].violent > 499 &&
-        countyCrimeData[d.properties.name].violent < 599
-      ) {
-        return '#1daee580';
-      } else if (countyCrimeData[d.properties.name].violent > 599) {
-        return '#1daee5';
+      if (currentView === 'rent') {
+        return rentColor(d.properties.name);
+      } else if (currentView === 'salary') {
+        return salaryColor(d.properties.name);
+      } else if (currentView === 'temperature') {
+        return tempColor(d.properties.name);
+      } else if (currentView === 'crime') {
+        return crimeColor(d.properties.name);
       }
     })
     .attr('d', d3.geoPath().projection(projection))
-    // d is a mousevent, drill down to find the county name
     .attr('id', function (d) {
-      return d.properties.name;
-    })
-    .on('mouseover', function (d) {
-      // console.log(d);
-      // console.log(d.path[0].__data__.properties.name);
-      var xPosition = 5900;
-      var yPosition = -300;
-      // 						var xPosition = parseFloat(path.centroid(this).attr("cx"));
-      // 						var yPosition = parseFloat(path.centroid(this).attr("cy"));
-      d3.select('#tooltip')
-        .style('position', 'absolute')
-        .style('left', d.x + 50 + 'px')
-        .style('top', d.y + 500 + 'px')
-        .text(d.path[0].__data__.properties.name + ' County')
-        .classed('hidden', false);
-    })
-    .on('mouseout', function () {
-      d3.select('#tooltip').classed('hidden', true);
+      return d.properties.name.replace(' ', '');
     });
 
   svg.call(
@@ -114,26 +83,31 @@ d3.json(
         [0, 0],
         [width, height],
       ])
-      .on('end', updateStats)
+      .on('end', updateOnBrushEnd)
   );
 
-  crimeData = data.features;
-  findTopFive('crime', crimeData);
+  countyNameData = data.features;
+  findTopFive(currentView, countyNameData);
+  changeKey();
+  updateRange(tempRange);
 });
 
-//	<div id="tooltip" class="hidden">
-//            <p>County: <span id="county">County Name</span></p>
-//        </div>
-
 function findTopFive(cat, data) {
+  if (data.length < 5) {
+    console.log('less than 5!');
+  }
   if (document.getElementById('vis-2-svg')) {
     document.getElementById('vis-2-svg').remove();
+  }
+  let allVals = [];
+  for (let d of data) {
+    allVals.push(countyData[d.properties.name][currentView]);
   }
   const top5 = data
     .sort(function (a, b) {
       return (
-        countyCrimeData[b.properties.name].violent -
-        countyCrimeData[a.properties.name].violent
+        countyData[b.properties.name][currentView] -
+        countyData[a.properties.name][currentView]
       );
     })
     .slice(0, 5);
@@ -142,29 +116,32 @@ function findTopFive(cat, data) {
   let top5Names = [];
 
   for (const t of top5) {
-    top5Vals.push(countyCrimeData[t.properties.name].violent);
+    top5Vals.push(countyData[t.properties.name][currentView]);
     top5Names.push(t.properties.name);
   }
 
   const xscale = d3
     .scaleBand()
     .domain(top5Names.map((d) => d))
-    .range([0, 260])
+    .range([0, 255])
     .padding(0.3);
 
-  const yscale = d3.scaleLinear().domain([0, 2300]).range([200, 0]);
+  const yscale = d3
+    .scaleLinear()
+    .domain([0, Math.max(...allVals)])
+    .range([250, 10]);
 
   const x_axis = d3.axisBottom().scale(xscale);
 
   const y_axis = d3.axisLeft().scale(yscale);
 
-  var xAxisTranslate = 210 / 2 + 95;
+  var xAxisTranslate = 180 / 2 + 160;
 
   let svg2 = d3
     .select('#vis-2')
     .append('svg')
-    .attr('width', 290)
-    .attr('height', 220)
+    .attr('width', 300)
+    .attr('height', 300)
     .attr('id', 'vis-2-svg')
     .append('g')
     .attr('transform', 'translate(35, 0)')
@@ -173,70 +150,108 @@ function findTopFive(cat, data) {
   svg2
     .append('g')
     .attr('transform', 'translate(0, ' + xAxisTranslate + ')')
-    .call(x_axis);
+    .call(x_axis)
+    .selectAll('text')
+    .style('text-anchor', 'end')
+    .attr('dx', '.6em')
+    .attr('dy', '.65em')
+    .attr('transform', 'rotate(-35)');
 
   svg2
     .selectAll('rect')
     .data(top5)
     .enter()
     .append('rect')
-    .attr('width', 30)
-    .attr('height', function (data) {
-      return countyCrimeData[data.properties.name].violent / 10;
+    .attr('id', function (d) {
+      return d.properties.name + ' Bar';
     })
-    .attr('x', function (data, i) {
-      return 16 + i * (30 + 20);
+    .attr('height', function (data) {
+      return (
+        (countyData[data.properties.name][currentView] / Math.max(...allVals)) *
+        230
+      );
     })
     .attr('y', function (data) {
-      return 200 - countyCrimeData[data.properties.name].violent / 10;
+      return (
+        240 -
+        (countyData[data.properties.name][currentView] / Math.max(...allVals)) *
+          230
+      );
     })
+    .style('stroke', 'black')
     .attr('fill', function (d) {
-      if (countyCrimeData[d.properties.name].violent < 49) {
-        return '#1daee510';
-      } else if (
-        countyCrimeData[d.properties.name].violent > 49 &&
-        countyCrimeData[d.properties.name].violent < 99
-      ) {
-        return '#1daee520';
-      } else if (
-        countyCrimeData[d.properties.name].violent > 99 &&
-        countyCrimeData[d.properties.name].violent < 149
-      ) {
-        return '#1daee530';
-      } else if (
-        countyCrimeData[d.properties.name].violent > 149 &&
-        countyCrimeData[d.properties.name].violent < 199
-      ) {
-        return '#1daee540';
-      } else if (
-        countyCrimeData[d.properties.name].violent > 199 &&
-        countyCrimeData[d.properties.name].violent < 299
-      ) {
-        return '#1daee550';
-      } else if (
-        countyCrimeData[d.properties.name].violent > 299 &&
-        countyCrimeData[d.properties.name].violent < 399
-      ) {
-        return '#1daee560';
-      } else if (
-        countyCrimeData[d.properties.name].violent > 399 &&
-        countyCrimeData[d.properties.name].violent < 499
-      ) {
-        return '#1daee570';
-      } else if (
-        countyCrimeData[d.properties.name].violent > 499 &&
-        countyCrimeData[d.properties.name].violent < 599
-      ) {
-        return '#1daee580';
-      } else if (countyCrimeData[d.properties.name].violent > 599) {
-        return '#1daee5';
+      if (currentView === 'rent') {
+        return rentColor(d.properties.name);
+      } else if (currentView === 'salary') {
+        return salaryColor(d.properties.name);
+      } else if (currentView === 'temperature') {
+        return tempColor(d.properties.name);
+      } else if (currentView === 'crime') {
+        return crimeColor(d.properties.name);
+      }
+    })
+    .on('mouseover', function (d) {
+      console.log(currentView);
+      let county = this.id.replace(' Bar', '').replace(' ', '');
+      let countyId = '#' + county;
+      if (currentView === 'rent') {
+        document.getElementById('tooltip').textContent =
+          '$' + countyData[this.id.replace(' Bar', '')][currentView];
+        d3.select(countyId).attr('fill', 'yellow');
+      } else if (currentView === 'salary') {
+        document.getElementById('tooltip').textContent =
+          '$' + countyData[this.id.replace(' Bar', '')][currentView];
+        d3.select(countyId).attr('fill', 'red');
+      } else if (currentView === 'temperature') {
+        document.getElementById('tooltip').textContent =
+          countyData[this.id.replace(' Bar', '')][currentView] + '℉';
+        d3.select(countyId).attr('fill', 'red');
+      } else if (currentView === 'crime') {
+        document.getElementById('tooltip').textContent =
+          countyData[this.id.replace(' Bar', '')][currentView] + ' / year';
+        d3.select(countyId).attr('fill', 'yellow');
+      }
+      document.getElementById('tooltip').style.display = 'block';
+      document.getElementById('tooltip').style.left = d.pageX + 'px';
+      document.getElementById('tooltip').style.top = d.pageY - 40 + 'px';
+    })
+    .on('mouseout', function () {
+      document.getElementById('tooltip').style.display = 'none';
+      let county = this.id.replace(' Bar', '');
+      let countyConcat = county.replace(' ', '');
+      let countyId = '#' + countyConcat;
+      if (currentView === 'rent') {
+        d3.select(countyId).attr('fill', rentColor(county));
+      } else if (currentView === 'salary') {
+        d3.select(countyId).attr('fill', salaryColor(county));
+      } else if (currentView === 'temperature') {
+        d3.select(countyId).attr('fill', tempColor(county));
+      } else if (currentView === 'crime') {
+        d3.select(countyId).attr('fill', crimeColor(county));
       }
     });
+
+  if (data.length >= 5) {
+    svg2
+      .selectAll('rect')
+      .attr('width', 48)
+      .attr('x', function (data, i) {
+        return i * 48 + 10;
+      });
+  } else {
+    let dist = 240 / data.length;
+    svg2
+      .selectAll('rect')
+      .attr('width', dist)
+      .attr('x', function (d, i) {
+        let v = 240 / data.length;
+        return i * v + 10;
+      });
+  }
 }
 
 //Is called when we brush on scatterplot #1
-function updateStats(brushEvent) {
-  console.log(brushEvent.selection);
+function updateOnBrushEnd(brushEvent) {
   let rangeWithinDiv = brushEvent.selection;
 
   let parent = document.getElementById('vis-svg-1').getBoundingClientRect();
@@ -254,41 +269,296 @@ function updateStats(brushEvent) {
         center[1] >= rangeWithinDiv[0][1] &&
         center[1] <= rangeWithinDiv[1][1]
       ) {
-        dataArr.push({ properties: { name: this.id } });
+        dataArr.push({
+          properties: { name: this.id.replace(/([a-z])([A-Z])/g, '$1 $2') },
+        });
         d3.select(this).style('opacity', '1');
       } else {
         d3.select(this).style('opacity', '0.2');
       }
-      findTopFive('crime', dataArr);
     } else {
       d3.select(this).style('opacity', '1');
-      findTopFive('crime', crimeData);
     }
   });
+  if (dataArr.length > 0) {
+    findTopFive(currentView, dataArr);
+    if (dataArr.length > 5) {
+      if (currentView === 'temperature') {
+        document.getElementById('subTitle').textContent =
+          'Top 5 Hottest Counties in Your Selection';
+      } else if (currentView === 'salary') {
+        document.getElementById('subTitle').textContent =
+          'Top 5 Highest Earning Counties in Your Selection';
+      } else if (currentView === 'rent') {
+        document.getElementById('subTitle').textContent =
+          'Top 5 Most Expensive Counties in Your Selection';
+      } else if (currentView === 'crime') {
+        document.getElementById('subTitle').textContent =
+          'Top 5 Most Dangerous Counties in Your Selection';
+      }
+    } else if (dataArr.length === 1) {
+      ('Viewing Data for 1 Selected County');
+    } else {
+      document.getElementById('subTitle').textContent =
+        'Viewing Data for ' + dataArr.length + ' Selected Counties';
+    }
+  } else {
+    d3.selectAll('path').style('opacity', '1');
+    findTopFive(currentView, countyNameData);
+    if (currentView === 'temperature') {
+      document.getElementById('subTitle').textContent =
+        'Top 5 Hottest Counties in California';
+    } else if (currentView === 'salary') {
+      document.getElementById('subTitle').textContent =
+        'Top 5 Highest Earning Counties in California';
+    } else if (currentView === 'rent') {
+      document.getElementById('subTitle').textContent =
+        'Top 5 Most Expensive Counties in California';
+    } else if (currentView === 'crime') {
+      document.getElementById('subTitle').textContent =
+        'Top 5 Most Dangerous Counties in California';
+    }
+  }
+}
 
-  // d3.selectAll('circle').each(function () {
-  //   const plot = this.parentElement.parentElement.parentElement.parentElement
-  //     .id;
-  //   const thisD3 = d3.select(this);
-  //   if (
-  //     plot === 'dataviz_brushScatter' &&
-  //     isBrushed(extent, thisD3.attr('cx'), thisD3.attr('cy'))
-  //   ) {
-  //     brushedArr.push(this.id);
-  //   }
-  // });
+const rentRange = ['<700', 800, 900, 1000, 1200, 1500, 1800, '2000+'];
+const crimeRange = [0, 50, 100, 200, 300, 400, 500, '600+'];
+const salaryRange = ['< 800', 900, 1000, 1100, 1300, 1800, 2200, '2900+'];
+const tempRange = ['< 52', 54, 56, 58, 60, 62, 64, '66+'];
 
-  // d3.selectAll('circle')
-  //   .style('stroke', function () {
-  //     const plot = this.parentElement.parentElement.parentElement
-  //       .parentElement.id;
-  //     if (plot === 'dataviz_brushScatter2') {
-  //       if (brushedArr.includes(this.id)) {
-  //         return 'black';
-  //       } else {
-  //         return 'transparent';
-  //       }
-  //     }
-  //   })
-  //   .style('stroke-width', '2px');
+function changeDataView(event) {
+  currentView = event.value;
+  findTopFive(currentView, countyNameData);
+  d3.selectAll('path').attr('fill', function (d) {
+    if (d) {
+      if (currentView === 'rent') {
+        document.getElementById('rightTitle').textContent =
+          'Average 1 BR Apartment Monthly Rent ($)';
+        document.getElementById('subTitle').textContent =
+          'Top 5 Most Expensive Counties in California';
+        currentColor = '#1daee5';
+        changeKey();
+        updateRange(rentRange);
+        return rentColor(d.properties.name);
+      } else if (currentView === 'salary') {
+        document.getElementById('rightTitle').textContent =
+          'Average Weekly Take-Home Income ($)';
+        document.getElementById('subTitle').textContent =
+          'Top 5 Highest Earning Counties in California';
+        currentColor = '#00FFAA';
+        updateRange(salaryRange);
+        changeKey();
+        return salaryColor(d.properties.name);
+      } else if (currentView === 'temperature') {
+        document.getElementById('rightTitle').textContent =
+          'Average Temperature (℉)';
+        document.getElementById('subTitle').textContent =
+          'Top 5 Hottest Counties in California';
+        currentColor = '#FFAE00';
+        updateRange(tempRange);
+        changeKey();
+        return tempColor(d.properties.name);
+      } else if (currentView === 'crime') {
+        document.getElementById('rightTitle').textContent =
+          'Acts of Violent Crime';
+        document.getElementById('subTitle').textContent =
+          'Top 5 Most Dangerous Counties in California';
+        currentColor = '#FF3536';
+        changeKey();
+        updateRange(crimeRange);
+        return crimeColor(d.properties.name);
+      }
+    }
+  });
+}
+
+function changeKey() {
+  for (let i = 1; i < 10; i++) {
+    if (i === 9) {
+      document.getElementById(
+        'b' + i.toString()
+      ).style.backgroundColor = currentColor;
+    } else {
+      document.getElementById('b' + i.toString()).style.backgroundColor =
+        currentColor + (i + 1).toString() + '0';
+    }
+  }
+}
+
+function updateRange(arr) {
+  for (let i = 1; i < 9; i++) {
+    document.getElementById('p' + i.toString()).textContent = arr[i - 1];
+  }
+}
+
+function rentColor(countyName) {
+  if (countyData[countyName].rent < 701) {
+    return '#1daee510';
+  } else if (
+    countyData[countyName].rent > 700 &&
+    countyData[countyName].rent < 801
+  ) {
+    return '#1daee520';
+  } else if (
+    countyData[countyName].rent > 800 &&
+    countyData[countyName].rent < 901
+  ) {
+    return '#1daee530';
+  } else if (
+    countyData[countyName].rent > 900 &&
+    countyData[countyName].rent < 1001
+  ) {
+    return '#1daee540';
+  } else if (
+    countyData[countyName].rent > 1000 &&
+    countyData[countyName].rent < 1201
+  ) {
+    return '#1daee550';
+  } else if (
+    countyData[countyName].rent > 1200 &&
+    countyData[countyName].rent < 1501
+  ) {
+    return '#1daee560';
+  } else if (
+    countyData[countyName].rent > 1500 &&
+    countyData[countyName].rent < 1801
+  ) {
+    return '#1daee570';
+  } else if (
+    countyData[countyName].rent > 1800 &&
+    countyData[countyName].rent < 2001
+  ) {
+    return '#1daee580';
+  } else if (countyData[countyName].rent > 2000) {
+    return '#1daee5';
+  }
+}
+
+function salaryColor(countyName) {
+  if (countyData[countyName].salary < 801) {
+    return '#00FFAA10';
+  } else if (
+    countyData[countyName].salary > 800 &&
+    countyData[countyName].salary < 901
+  ) {
+    return '#00FFAA20';
+  } else if (
+    countyData[countyName].salary > 900 &&
+    countyData[countyName].salary < 1001
+  ) {
+    return '#00FFAA30';
+  } else if (
+    countyData[countyName].salary > 1000 &&
+    countyData[countyName].salary < 1101
+  ) {
+    return '#00FFAA40';
+  } else if (
+    countyData[countyName].salary > 1100 &&
+    countyData[countyName].salary < 1301
+  ) {
+    return '#00FFAA50';
+  } else if (
+    countyData[countyName].salary > 1300 &&
+    countyData[countyName].salary < 1801
+  ) {
+    return '#00FFAA60';
+  } else if (
+    countyData[countyName].salary > 1800 &&
+    countyData[countyName].salary < 2201
+  ) {
+    return '#00FFAA70';
+  } else if (
+    countyData[countyName].salary > 2200 &&
+    countyData[countyName].salary < 2901
+  ) {
+    return '#00FFAA80';
+  } else if (countyData[countyName].salary > 2900) {
+    return '#00FFAA';
+  }
+}
+
+function crimeColor(countyName) {
+  if (countyData[countyName].crime <= 49) {
+    return '#FF353610';
+  } else if (
+    countyData[countyName].crime > 49 &&
+    countyData[countyName].crime <= 99
+  ) {
+    return '#FF353620';
+  } else if (
+    countyData[countyName].crime > 99 &&
+    countyData[countyName].crime <= 149
+  ) {
+    return '#FF353630';
+  } else if (
+    countyData[countyName].crime > 149 &&
+    countyData[countyName].crime <= 199
+  ) {
+    return '#FF353640';
+  } else if (
+    countyData[countyName].crime > 199 &&
+    countyData[countyName].crime <= 299
+  ) {
+    return '#FF353650';
+  } else if (
+    countyData[countyName].crime > 299 &&
+    countyData[countyName].crime <= 399
+  ) {
+    return '#FF353660';
+  } else if (
+    countyData[countyName].crime > 399 &&
+    countyData[countyName].crime <= 499
+  ) {
+    return '#FF353670';
+  } else if (
+    countyData[countyName].crime > 499 &&
+    countyData[countyName].crime <= 599
+  ) {
+    return '#FF353680';
+  } else if (countyData[countyName].crime > 599) {
+    return '#FF3536';
+  }
+}
+
+function tempColor(countyName) {
+  if (countyData[countyName].temperature <= 52) {
+    return '#FFAE0020';
+  } else if (
+    countyData[countyName].temperature > 52 &&
+    countyData[countyName].temperature <= 54
+  ) {
+    return '#FFAE0030';
+  } else if (
+    countyData[countyName].temperature > 54 &&
+    countyData[countyName].temperature < 56
+  ) {
+    return '#FFAE0040';
+  } else if (
+    countyData[countyName].temperature > 54 &&
+    countyData[countyName].temperature <= 58
+  ) {
+    return '#FFAE0050';
+  } else if (
+    countyData[countyName].temperature > 58 &&
+    countyData[countyName].temperature <= 60
+  ) {
+    return '#FFAE0060';
+  } else if (
+    countyData[countyName].temperature > 60 &&
+    countyData[countyName].temperature <= 62
+  ) {
+    return '#FFAE0070';
+  } else if (
+    countyData[countyName].temperature > 62 &&
+    countyData[countyName].temperature <= 64
+  ) {
+    return '#FFAE0080';
+  } else if (
+    countyData[countyName].temperature > 64 &&
+    countyData[countyName].temperature <= 66
+  ) {
+    return '#FFAE0090';
+  } else if (countyData[countyName].temperature > 66) {
+    return '#FFAE00';
+  }
 }

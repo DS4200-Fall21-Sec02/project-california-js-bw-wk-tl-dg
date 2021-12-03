@@ -106,49 +106,51 @@
         width="600"
         height="600"
       >
-        <div id="tooltip" class="hidden">
-          <p>
-            County:
-            <span id="county">County Name</span>
-          </p>
-        </div>
+        <div id="tooltip" style="display: none; z-index: 100"></div>
         <!-- Don't delete the closing tag! -->
       </svg>
 
       <div class="right">
         <div class="graphKey">
+          <div class="dropdown">
+            <select required onchange="changeDataView(event.target)">
+              <!-- <option value="overall">Overall Livability Index</option> -->
+              <option value="temperature" selected>
+                Average Temperature By County
+              </option>
+              <option value="salary">Average Salary By County</option>
+              <option value="rent">Average County Rent By County</option>
+              <option value="crime">
+                Annual Acts of Violent Crime By County
+              </option>
+            </select>
+          </div>
           <div class="blockContainer">
-            <div class="block" style="background-color: #1daee510"></div>
-            <div class="block" style="background-color: #1daee520"></div>
-            <div class="block" style="background-color: #1daee530"></div>
-            <div class="block" style="background-color: #1daee540"></div>
-            <div class="block" style="background-color: #1daee550"></div>
-            <div class="block" style="background-color: #1daee560"></div>
-            <div class="block" style="background-color: #1daee570"></div>
-            <div class="block" style="background-color: #1daee580"></div>
-            <div class="block" style="background-color: #1daee5"></div>
+            <div id="b1" class="block"></div>
+            <div id="b2" class="block"></div>
+            <div id="b3" class="block"></div>
+            <div id="b4" class="block"></div>
+            <div id="b5" class="block"></div>
+            <div id="b6" class="block"></div>
+            <div id="b7" class="block"></div>
+            <div id="b8" class="block"></div>
+            <div id="b9" class="block"></div>
           </div>
           <div class="valueContainer">
-            <p>0</p>
-            <p>50</p>
-            <p>100</p>
-            <p>150</p>
-            <p>200</p>
-            <p>300</p>
-            <p>400</p>
-            <p>500</p>
-            <p>600+</p>
+            <p id="p1">< 700</p>
+            <p id="p2">800</p>
+            <p id="p3">900</p>
+            <p id="p4">1000</p>
+            <p id="p5">1200</p>
+            <p id="p6">1500</p>
+            <p id="p7">1800</p>
+            <p id="p8">2000+</p>
           </div>
         </div>
         <div class="rightpanel">
-          <div class="dropdown">
-            <select required>
-              <option value="overall">Overall Livability Index</option>
-              <option value="rent" selected>Average Rent</option>
-              <option value="salary" selected>Average Salary in 2019</option>
-              <option value="crime" selected>Violent Crimes in 2019</option>
-              <option value="weather">Average Weather in 2019</option>
-            </select>
+          <div id="rightTitle">Average Temperature (℉)</div>
+          <div class="subTitle" id="subTitle">
+            Top 5 Hottest Counties in California
           </div>
           <div class="rightmain" id="vis-2">
             <!-- <p>No county selected</p> -->
